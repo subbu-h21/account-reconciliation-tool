@@ -1,0 +1,20 @@
+# Secrets — NEVER commit
+flask-backend/.env
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+flask-backend/__pycache__/
+flask-backend/services/__pycache__/
+
+# Uploaded/generated files
+flask-backend/uploads/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
