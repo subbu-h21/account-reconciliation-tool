@@ -19,11 +19,11 @@ WHITE  = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid"
 MODEL          = "openai/gpt-4o-mini"
 PILE_TOLERANCE = 1.0
 
-# 0-based column indices: Date=0, Books name=1, Books amt=2, blank=3, Bank name=4, Bank amt=5
+# 0-based column indices: Date=0, Books name=1, Books amt=2, Bank amt=3, Bank name=4
 BOOKS_NAME_COL = 1
 BOOKS_AMT_COL  = 2
+BANK_AMT_COL   = 3
 BANK_NAME_COL  = 4
-BANK_AMT_COL   = 5
 
 _TOOL = {
     "type": "function",
@@ -363,7 +363,7 @@ def _rewrite_sheet(ws, date_blocks):
             kname = bank_entry[0]  if bank_entry  else None
             kamt  = bank_entry[1]  if bank_entry  else None
 
-            vals = [date_val, bname, bamt, None, kname, kamt]
+            vals = [date_val, bname, bamt, kamt, kname]
             for col_idx, val in enumerate(vals, 1):
                 cell = ws.cell(row=row_idx, column=col_idx, value=val)
                 cell.fill = fill
@@ -379,7 +379,7 @@ def _rewrite_sheet(ws, date_blocks):
             write_row(be, ke, WHITE)
 
         # grey separator
-        for col_idx in range(1, 7):
+        for col_idx in range(1, 6):
             cell = ws.cell(row=row_idx, column=col_idx, value=None)
             cell.fill = GREY
         row_idx += 1

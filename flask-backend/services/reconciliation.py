@@ -45,11 +45,11 @@ def process_receivements(ac_path, books_path, timestamp):
         only_ac += [(None, None)] * (L - len(only_ac))
         only_ob += [(None, None)] * (L - len(only_ob))
         if prev is not None and d != prev:
-            rows.append({'Date': None, 'Books': None, 'Debit': None, '': None, 'Bank': None, 'Received': None})
+            rows.append({'Date': None, 'Books': None, 'Debit': None, 'Received': None, 'Bank': None})
         for (acn, acamt), (obn, obamt) in zip(only_ac, only_ob):
-            rows.append({'Date': d, 'Books': obn, 'Debit': obamt, '': None, 'Bank': acn, 'Received': acamt})
+            rows.append({'Date': d, 'Books': obn, 'Debit': obamt, 'Received': acamt, 'Bank': acn})
         prev = d
-    return pd.DataFrame(rows)[['Date', 'Books', 'Debit', '', 'Bank', 'Received']]
+    return pd.DataFrame(rows)[['Date', 'Books', 'Debit', 'Received', 'Bank']]
 
 # 2nd: payments discrepancy
 def process_payments(ac_path, books_path, timestamp):
@@ -81,11 +81,11 @@ def process_payments(ac_path, books_path, timestamp):
         L=max(len(only_ac),len(only_ob),1)
         only_ac+=[(None,None)]*(L-len(only_ac)); only_ob+=[(None,None)]*(L-len(only_ob))
         if prev is not None and d!=prev:
-            rows.append({'Date':None,'Books':None,'Credit':None,'':None,'Bank':None,'Given':None})
+            rows.append({'Date':None,'Books':None,'Credit':None,'Given':None,'Bank':None})
         for (acn,acamt),(obn,obamt) in zip(only_ac,only_ob):
-            rows.append({'Date':d,'Books':obn,'Credit':obamt,'':None,'Bank':acn,'Given':acamt})
+            rows.append({'Date':d,'Books':obn,'Credit':obamt,'Given':acamt,'Bank':acn})
         prev=d
-    final=pd.DataFrame(rows)[['Date','Books','Credit','','Bank','Given']]
+    final=pd.DataFrame(rows)[['Date','Books','Credit','Given','Bank']]
     return final
 
 def process_summary(ac_path, books_path):
