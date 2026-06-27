@@ -60,13 +60,10 @@ def process_files():
     if not allowed_file(ac_file.filename) or not allowed_file(ob_file.filename):
         return jsonify({"error": "Only .xls and .xlsx files are allowed"}), 400
 
-    use_ai      = request.form.get('ai_matching') == 'on'
-    ai_provider = request.form.get('ai_provider', 'gemini')
+    use_ai = request.form.get('ai_matching') == 'on'
 
     if use_ai:
-        if ai_provider == 'gemini' and not os.getenv("GEMINI_API_KEY"):
-            return jsonify({"error": "AI matching requested but GEMINI_API_KEY is not set"}), 400
-        if ai_provider == 'openai' and not (os.getenv("OPEN_ROUTER_API_KEY") or "").strip():
+        if not (os.getenv("OPEN_ROUTER_API_KEY") or "").strip():
             return jsonify({"error": "AI matching requested but OPEN_ROUTER_API_KEY is not set"}), 400
 
     ac_path = save_upload(ac_file)
@@ -94,7 +91,6 @@ def process_files():
             result = process_files_task(
                 ac_path, ob_path, out, timestamp,
                 use_ai=use_ai,
-                ai_provider=ai_provider,
                 log_queue=log_queue,
             )
         except Exception as e:

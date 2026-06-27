@@ -5,8 +5,7 @@ flask-backend/.env
 __pycache__/
 *.pyc
 *.pyo
-flask-backend/__pycache__/
-flask-backend/services/__pycache__/
+*.pyd
 
 # Uploaded/generated files
 flask-backend/uploads/
@@ -15,6 +14,15 @@ flask-backend/uploads/
 venv/
 .venv/
 env/
+ENV/
 
 # IDE
 .vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings
+.claude/

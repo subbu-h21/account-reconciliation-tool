@@ -417,45 +417,6 @@ h1 {
 .log-line.header  { color: #c8d0e0; }
 .log-line.done    { color: var(--green); font-weight: 600; }
 
-.provider-row { display: none; margin-bottom: 20px; }
-.provider-row.show { display: block; }
-
-.provider-options {
-    display: flex;
-    gap: 10px;
-}
-
-.provider-opt {
-    flex: 1;
-    padding: 12px 14px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface2);
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-}
-
-.provider-opt input { display: none; }
-
-.provider-opt.active {
-    border-color: var(--accent);
-    background: var(--accent-dim);
-}
-
-.provider-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text);
-}
-
-.provider-desc {
-    font-size: 11px;
-    color: var(--text-dim);
-    line-height: 1.3;
-}
 
 @media (max-width: 900px) {
     .layout { flex-direction: column; }
@@ -508,21 +469,6 @@ h1 {
             </div>
         </label>
 
-        <div class="provider-row" id="providerRow">
-            <span class="field-label" style="margin-bottom:10px;display:block;">AI Provider</span>
-            <div class="provider-options">
-                <label class="provider-opt active" id="optGemini">
-                    <input type="radio" name="ai_provider" value="gemini" checked>
-                    <span class="provider-name">Gemini 2.5 Flash</span>
-                    <span class="provider-desc">Highlights matched entries in yellow</span>
-                </label>
-                <label class="provider-opt" id="optOpenAI">
-                    <input type="radio" name="ai_provider" value="openai">
-                    <span class="provider-name">GPT-5 Nano</span>
-                    <span class="provider-desc">Highlights unmatched entries in orange</span>
-                </label>
-            </div>
-        </div>
 
         <button class="btn" type="submit" id="submitBtn">Run Reconciliation</button>
 
@@ -550,7 +496,6 @@ h1 {
 </div><!-- .layout -->
 
 <script>
-const providerRow   = document.getElementById("providerRow")
 const form          = document.getElementById("uploadForm")
 const statusBox     = document.getElementById("statusBox")
 const statusText    = document.getElementById("statusText")
@@ -579,16 +524,7 @@ document.querySelectorAll('.file-drop input[type="file"]').forEach((input) => {
 aiToggle.addEventListener('click', () => {
     setTimeout(() => {
         aiToggle.classList.toggle('active', aiCheck.checked)
-        providerRow.classList.toggle('show', aiCheck.checked)
     }, 0)
-})
-
-// Provider selector
-document.querySelectorAll('.provider-opt').forEach(opt => {
-    opt.addEventListener('click', () => {
-        document.querySelectorAll('.provider-opt').forEach(o => o.classList.remove('active'))
-        opt.classList.add('active')
-    })
 })
 
 function setStatus(type, msg, showSpinner) {
@@ -598,12 +534,10 @@ function setStatus(type, msg, showSpinner) {
 }
 
 function lineClass(msg) {
-    if (msg.includes('sending to model'))              return 'sending'
-    if (msg.includes('→ raw:'))                        return 'raw'
-    if (msg.includes('→ matched'))                     return 'matched'
-    if (msg.includes('ERROR') || msg.includes('WARN')) return 'logerr'
-    if (msg.includes('Done.'))                         return 'done'
-    if (msg.includes('Sheet:') || msg.includes('AI matching started')) return 'header'
+    if (msg.includes('Sending') && msg.includes('piles to AI')) return 'sending'
+    if (msg.includes('pile error') || msg.includes('ERROR') || msg.includes('WARN')) return 'logerr'
+    if (msg.includes('Done.'))                                   return 'done'
+    if (msg.includes('AI matching started') || msg.includes('Processing sheet:') || msg.includes('rewritten')) return 'header'
     return ''
 }
 

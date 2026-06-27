@@ -20,42 +20,36 @@ def process_receivements(ac_path, books_path, timestamp):
             .reset_index(drop=True))
     # filter receivements
     recv_ac = ac[ac['Received'].notna()].copy()
-    recv_ob = ob[ob['Debit'] != 0].copy(); recv_ob['Particular'] = recv_ob['Particular'].str.strip()
+    recv_ob = ob[ob['Debit'].notna() & (ob['Debit'] != 0)].copy(); recv_ob['Particular'] = recv_ob['Particular'].str.strip()
     # helpers
     def trim(s): return s.strip()
     def inside(text): m = re.search(r'\((.*?)\)?$', str(text)); return m.group(1) if m else str(text)
     recv_ac['SupplierName'] = recv_ac['Particular'].apply(trim)
     recv_ob['Particular']    = recv_ob['Particular'].apply(inside)
+    # drop UPI entries at source
+    recv_ac = recv_ac[~recv_ac['SupplierName'].str.contains('UPI', na=False)]
+    recv_ob = recv_ob[~recv_ob['Particular'].str.contains('UPI', na=False)]
     # parse dates
     recv_ac['Date'] = pd.to_datetime(recv_ac['Date'], errors='coerce', dayfirst=True).dt.date
     recv_ob['Date'] = pd.to_datetime(recv_ob['Date'], errors='coerce', dayfirst=True).dt.date
-    # discrepancies list
-    discs = []
-    for d in sorted(set(recv_ac['Date'].dropna()) | set(recv_ob['Date'].dropna())):
-        a = recv_ac[recv_ac['Date']==d]; b = recv_ob[recv_ob['Date']==d]
-        names_ac = set(a['SupplierName']); names_ob = set(b['Particular'])
-        only_ob = list(names_ob - names_ac); only_ac = list(names_ac - names_ob)
-        L = max(len(only_ob), len(only_ac))
-        only_ob += [None]*(L-len(only_ob)); only_ac += [None]*(L-len(only_ac))
-        for obn, acn in zip(only_ob, only_ac): discs.append({'Date':d,'Not in account statement':obn,'Not in our books':acn})
-    df = pd.DataFrame(discs).sort_values('Date').reset_index(drop=True)
-    # sums
+    # parse amounts
     recv_ac['Received'] = recv_ac['Received'].replace({'\\$':'','\\,':'','\\s+':''}, regex=True).pipe(pd.to_numeric, errors='coerce')
     recv_ob['Debit']    = recv_ob['Debit'].replace({'\\$':'','\\,':'','\\s+':''}, regex=True).pipe(pd.to_numeric, errors='coerce')
-    sum_ac = recv_ac.groupby(['Date','SupplierName'])['Received'].sum().reset_index()
-    sum_ob = recv_ob.groupby(['Date','Particular'])['Debit'].sum().reset_index()
-    df = (df.merge(sum_ac, left_on=['Date','Not in our books'], right_on=['Date','SupplierName'], how='left').drop(columns=['SupplierName'])
-            .merge(sum_ob, left_on=['Date','Not in account statement'], right_on=['Date','Particular'], how='left').drop(columns=['Particular'])
-            .sort_values('Date').reset_index(drop=True))
-    # blank rows and filter UPI
+    # collect all individual entries per date
     rows, prev = [], None
-    for _,r in df.iterrows():
-        if prev and r['Date']!=prev: rows.append({'Date':None,'Not in account statement':None,'Not in our books':None})
-        rows.append(r.to_dict()); prev=r['Date']
-    final = pd.DataFrame(rows); final[''] = None
-    final = final[['Date','Not in account statement','Debit','', 'Not in our books','Received']]
-    final = final[~final['Not in account statement'].str.contains('UPI:', na=False) & ~final['Not in our books'].str.contains('UPI:', na=False)]
-    return final
+    for d in sorted(set(recv_ac['Date'].dropna()) | set(recv_ob['Date'].dropna())):
+        a = recv_ac[recv_ac['Date']==d]; b = recv_ob[recv_ob['Date']==d]
+        only_ac = list(zip(a['SupplierName'], a['Received']))
+        only_ob = list(zip(b['Particular'],   b['Debit']))
+        L = max(len(only_ac), len(only_ob), 1)
+        only_ac += [(None, None)] * (L - len(only_ac))
+        only_ob += [(None, None)] * (L - len(only_ob))
+        if prev is not None and d != prev:
+            rows.append({'Date': None, 'Books': None, 'Debit': None, '': None, 'Bank': None, 'Received': None})
+        for (acn, acamt), (obn, obamt) in zip(only_ac, only_ob):
+            rows.append({'Date': d, 'Books': obn, 'Debit': obamt, '': None, 'Bank': acn, 'Received': acamt})
+        prev = d
+    return pd.DataFrame(rows)[['Date', 'Books', 'Debit', '', 'Bank', 'Received']]
 
 # 2nd: payments discrepancy
 def process_payments(ac_path, books_path, timestamp):
@@ -67,33 +61,31 @@ def process_payments(ac_path, books_path, timestamp):
     ob = (pd.read_excel(books_path, header=None, engine=ob_eng).dropna(axis=1, how='all')
             .pipe(lambda df: df.rename(columns=df.iloc[0])).drop(index=0)
             .pipe(lambda df: df[~df['Particular'].str.contains('Opening balance|Closing balance', case=False, na=False)]).reset_index(drop=True))
-    pay_ac = ac[ac['Given'].notna()].copy(); pay_ob = ob[ob['Credit'] != 0].copy()
+    pay_ac = ac[ac['Given'].notna()].copy(); pay_ob = ob[ob['Credit'].notna() & (ob['Credit'] != 0)].copy()
     pay_ob['Particular'] = pay_ob['Particular'].str.strip()
+    # drop UPI entries at source
+    pay_ac = pay_ac[~pay_ac['Particular'].str.contains('UPI', na=False)]
+    pay_ob = pay_ob[~pay_ob['Particular'].str.contains('UPI', na=False)]
     def name_clean(desc): return re.sub(r"(NEFT-|MClick/To\s+)", "", str(desc)).strip()
     def sup_name(txn): parts=str(txn).split('/'); return parts[0].strip() if len(parts)>1 else str(txn)
     pay_ac['Particular']=pay_ac['Particular'].apply(name_clean); pay_ac['SupplierName']=pay_ac['Particular'].apply(sup_name)
     pay_ac['Date']=pd.to_datetime(pay_ac['Date'],errors='coerce',dayfirst=True).dt.date
     pay_ob['Date']=pd.to_datetime(pay_ob['Date'],errors='coerce',dayfirst=True).dt.date
-    discs=[]
-    for d in sorted(set(pay_ac['Date'].dropna()) | set(pay_ob['Date'].dropna())):
-        a=pay_ac[pay_ac['Date']==d]; b=pay_ob[pay_ob['Date']==d]
-        n_ac=set(a['SupplierName']); n_ob=set(b['Particular'])
-        only_ob=list(n_ob); only_ac=list(n_ac)
-        L=max(len(only_ob),len(only_ac)); only_ob+=[None]*(L-len(only_ob)); only_ac+=[None]*(L-len(only_ac))
-        for obn,acn in zip(only_ob,only_ac): discs.append({'Date':d,'Not in account statement':obn,'Not in our books':acn})
-    df=pd.DataFrame(discs).sort_values('Date').reset_index(drop=True)
     pay_ac['Given']=pay_ac['Given'].replace({'\\$':'','\\,':'','\\s+':''}, regex=True).pipe(pd.to_numeric, errors='coerce')
     pay_ob['Credit']=pay_ob['Credit'].replace({'\\$':'','\\,':'','\\s+':''}, regex=True).pipe(pd.to_numeric, errors='coerce')
-    sum_ac=pay_ac.groupby(['Date','SupplierName'])['Given'].sum().reset_index(); sum_ob=pay_ob.groupby(['Date','Particular'])['Credit'].sum().reset_index()
-    df=(df.merge(sum_ac,left_on=['Date','Not in our books'],right_on=['Date','SupplierName'],how='left').drop(columns=['SupplierName'])
-         .merge(sum_ob,left_on=['Date','Not in account statement'],right_on=['Date','Particular'],how='left').drop(columns=['Particular'])
-         .sort_values('Date').reset_index(drop=True))
     rows,prev=[],None
-    for _,r in df.iterrows():
-        if prev and r['Date']!=prev: rows.append({'Date':None,'Not in account statement':None,'Not in our books':None})
-        rows.append(r.to_dict()); prev=r['Date']
-    final=pd.DataFrame(rows); final['']=None
-    final=final[['Date','Not in account statement','Credit','','Not in our books','Given']]
+    for d in sorted(set(pay_ac['Date'].dropna()) | set(pay_ob['Date'].dropna())):
+        a=pay_ac[pay_ac['Date']==d]; b=pay_ob[pay_ob['Date']==d]
+        only_ac=list(zip(a['SupplierName'], a['Given']))
+        only_ob=list(zip(b['Particular'],   b['Credit']))
+        L=max(len(only_ac),len(only_ob),1)
+        only_ac+=[(None,None)]*(L-len(only_ac)); only_ob+=[(None,None)]*(L-len(only_ob))
+        if prev is not None and d!=prev:
+            rows.append({'Date':None,'Books':None,'Credit':None,'':None,'Bank':None,'Given':None})
+        for (acn,acamt),(obn,obamt) in zip(only_ac,only_ob):
+            rows.append({'Date':d,'Books':obn,'Credit':obamt,'':None,'Bank':acn,'Given':acamt})
+        prev=d
+    final=pd.DataFrame(rows)[['Date','Books','Credit','','Bank','Given']]
     return final
 
 def process_summary(ac_path, books_path):

@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def process_files_task(ac_path, ob_path, output_path, timestamp, use_ai=False, ai_provider="gemini", log_queue=None):
+def process_files_task(ac_path, ob_path, output_path, timestamp, use_ai=False, log_queue=None):
     start_time = time.time()
     ai_ran = False
     logger.info(f"Job started for output: {output_path}")
@@ -46,25 +46,19 @@ def process_files_task(ac_path, ob_path, output_path, timestamp, use_ai=False, a
         wb.save(output_path)
 
         if use_ai:
-            if ai_provider == "gemini":
-                api_key  = os.getenv("GEMINI_API_KEY")
-                key_name = "GEMINI_API_KEY"
-            else:
-                api_key  = (os.getenv("OPEN_ROUTER_API_KEY") or "").strip()
-                key_name = "OPEN_ROUTER_API_KEY"
-
+            api_key = (os.getenv("OPEN_ROUTER_API_KEY") or "").strip()
             if not api_key:
-                logger.warning(f"AI matching requested but {key_name} is not set")
+                logger.warning("AI matching requested but OPEN_ROUTER_API_KEY is not set")
             else:
                 def log(msg):
                     if log_queue:
                         log_queue.put(msg)
                 try:
-                    from services.matcher import apply_highlights
-                    apply_highlights(output_path, api_key=api_key, provider=ai_provider, log=log)
+                    from services.matcher import apply_matching
+                    apply_matching(output_path, api_key=api_key, log=log)
                     ai_ran = True
                 except Exception as e:
-                    logger.warning(f"AI highlighting failed: {e}")
+                    logger.warning(f"AI matching failed: {e}")
 
         duration = time.time() - start_time
         logger.info(f"Job completed in {duration:.2f} seconds")

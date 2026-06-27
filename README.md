@@ -1,81 +1,59 @@
 # Account Reconciliation Tool
 
-A Flask web application that reconciles bank account statements against internal accounting books — with optional AI-assisted transaction matching powered by **Google Gemini** or **OpenAI (via OpenRouter)**.
+A Flask web app that reconciles a bank account statement against internal accounting books. Upload two Excel files and get an instant discrepancy report — with optional AI-assisted transaction matching powered by **OpenRouter (GPT-4o-mini)**.
 
 ---
 
 ## Features
 
-- **Upload & Compare** — Upload two Excel files (bank statement + internal books) and get an instant discrepancy report
-- **Three-sheet Output** — Results exported as a formatted Excel file with separate sheets for Receivements, Payments, and Summary
-- **AI Matching** — Intelligently matches transactions with different naming conventions (e.g. `"NEFT-KAPILA"` → `"Kapila Pharma"`)
+- **Upload & Compare** — Upload two Excel files (bank statement + internal books) and get a formatted discrepancy report
+- **Three-sheet Output** — Results exported as an Excel file with separate sheets for Receivements, Payments, and Summary
+- **AI Matching** — Optionally uses AI to match transactions with different naming conventions (e.g. `NEFT-KAPILA-PHARMA` → `Kapila Pharma`) across three tiers:
+  - 🟡 **Yellow** — exact name + amount match
+  - 🔵 **Blue** — AI-matched (name similarity within ₹1 tolerance)
+  - ⬜ **White** — fuzzy fallback (Jaccard word similarity)
 - **Real-time Logs** — Live terminal in the UI streams AI matching progress via Server-Sent Events (SSE)
-- **Dual AI Provider** — Switch between Google Gemini (yellow highlights) and OpenAI GPT via OpenRouter (orange highlights)
-- **Dark UI** — Clean, responsive dark-theme interface with drag-and-drop file upload
+- **Dark UI** — Clean, responsive dark-theme interface
 
 ---
 
-## Screenshots
+## Prerequisites
 
-> Upload your files, optionally enable AI matching, and download the reconciliation report.
-
-| Upload Screen | AI Matching Terminal |
-|---|---|
-| *(drag & drop Excel files, toggle AI)* | *(live logs streamed during processing)* |
+- **Python 3.9+** — [Download](https://www.python.org/downloads/) (check *Add to PATH* during install)
+- **OpenRouter API key** — [Get one free](https://openrouter.ai/keys) *(only needed if you want AI matching)*
 
 ---
 
-## Tech Stack
+## Setup (Windows)
 
-| Layer | Technology |
-|---|---|
-| Backend | Python, Flask |
-| Data Processing | pandas, numpy, openpyxl, xlrd |
-| AI Providers | Google Gemini 2.5 Flash, OpenAI GPT-4o-mini (OpenRouter) |
-| Frontend | Vanilla JS, IBM Plex fonts, SSE |
-| Output | Excel (.xlsx) with conditional formatting |
+### Option A — Batch scripts (easiest)
 
----
+```
+1. Double-click setup.bat    ← installs everything
+2. Edit flask-backend\.env   ← paste your OpenRouter API key
+3. Double-click start.bat    ← launches the app and opens browser
+```
 
-## Getting Started
-
-### Prerequisites
-
-- Python 3.9+
-- A [Google Gemini API key](https://aistudio.google.com/apikey) and/or an [OpenRouter API key](https://openrouter.ai/keys)
-
-### Installation
+### Option B — Manual
 
 ```bash
-# 1. Clone the repository
+# 1. Clone the repo
 git clone https://github.com/subbu-h21/account-reconciliation-tool.git
-cd account-reconciliation-tool/flask-backend
+cd account-reconciliation-tool
 
 # 2. Create and activate a virtual environment
+cd flask-backend
 python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS/Linux
+venv\Scripts\activate
 
 # 3. Install dependencies
 pip install -r requirements.txt
 
 # 4. Set up environment variables
-cp .env.example .env
-# Edit .env and add your API keys
-```
+copy .env.example .env
+# Open .env and paste your OpenRouter API key
 
-### Configure API Keys
-
-Edit `flask-backend/.env`:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-OPEN_ROUTER_API_KEY=your_open_router_api_key_here
-```
-
-### Run the App
-
-```bash
+# 5. Run
 python app.py
 ```
 
@@ -83,75 +61,55 @@ Open your browser at **http://localhost:5000**
 
 ---
 
+## Environment Variables
+
+Edit `flask-backend/.env`:
+
+```env
+OPEN_ROUTER_API_KEY=your_openrouter_key_here
+```
+
+The app runs fine without this key — AI matching will simply be unavailable.
+
+---
+
 ## Usage
 
 1. **Upload** your bank account statement (`.xlsx` / `.xls`)
 2. **Upload** your internal books file (`.xlsx` / `.xls`)
-3. *(Optional)* Toggle **AI Matching** and select a provider (Gemini or OpenAI)
-4. Click **Process**
-5. Watch the live terminal for AI matching progress
-6. Click **Download** to get your reconciliation report
+3. *(Optional)* Toggle **AI Matching**
+4. Click **Run Reconciliation**
+5. Watch the live terminal for AI matching progress (AI mode only)
+6. Click **Download** to get the reconciliation report
 
 ### Output Excel Structure
 
 | Sheet | Contents |
 |---|---|
-| `Receivements` | Inbound transactions — entries in bank not in books, and vice versa |
-| `Payments` | Outbound transactions — same discrepancy breakdown |
-| `Summary` | Side-by-side metrics: counts, totals, closing balances, and differences |
-
-AI-matched entries are highlighted:
-- **Yellow** — matched by Gemini
-- **Orange** — unmatched flagged by OpenAI
+| `Receivements` | Side-by-side inbound transactions (Books Debit vs Bank Received) |
+| `Payments` | Side-by-side outbound transactions (Books Credit vs Bank Given) |
+| `Summary` | Per-day metrics: entry counts, totals, closing balances, and differences |
 
 ---
 
 ## Project Structure
 
 ```
-flask-backend/
-├── app.py                  # Flask app, routes, session management
-├── tasks.py                # Background task processor
-├── requirements.txt
-├── .env.example            # API key template
-├── templates/
-│   └── index.html          # Frontend UI
-├── services/
-│   ├── reconciliation.py   # Core reconciliation logic
-│   └── matcher.py          # AI matching (Gemini + OpenRouter)
-└── uploads/                # Temporary output files (git-ignored)
+account-reconciliation-tool/
+├── setup.bat                   # First-time setup script
+├── start.bat                   # Launch the app
+└── flask-backend/
+    ├── app.py                  # Flask routes + SSE streaming
+    ├── tasks.py                # Background task orchestrator
+    ├── requirements.txt
+    ├── .env.example            # API key template
+    ├── templates/
+    │   └── index.html          # Frontend UI (vanilla JS)
+    ├── services/
+    │   ├── reconciliation.py   # Core reconciliation logic
+    │   └── matcher.py          # 3-tier AI matching engine
+    └── uploads/                # Temporary output files (git-ignored)
 ```
-
----
-
-## How It Works
-
-```
-User uploads 2 Excel files
-        ↓
-Flask creates a session ID and spawns a background thread
-        ↓
-pandas loads and filters both files
-        ↓
-reconciliation.py identifies unmatched entries (by name + amount + date)
-        ↓
-[If AI enabled] matcher.py batches entries (10 dates/batch) → sends to AI
-        ↓
-AI returns match flags → openpyxl applies color highlights
-        ↓
-Output .xlsx written → streamed to user for download
-```
-
----
-
-## Configuration
-
-| Variable | Description |
-|---|---|
-| `GEMINI_API_KEY` | Google AI Studio API key for Gemini 2.5 Flash |
-| `OPEN_ROUTER_API_KEY` | OpenRouter key for GPT-4o-mini access |
-
-Max upload size: **50 MB** per file. Processing timeout: **600 seconds**.
 
 ---
 
